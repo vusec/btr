@@ -1,0 +1,21 @@
+Max hits without loop:
+- Configuration: {'n_his': 8192, 'loop_var': 0, 'loop_type': 0, 'train_type': 2}
+- Max hits: 4790
+
+Max hits with busy empty loop:
+- 10**6 cpu cycles: 4732
+- 10**7 cpu cycles: 4770
+- 10**8 cpu cycles: 4669
+- 10**9 cpu cycles: 4722
+
+Max hits with busy empty loop, rewritten target:
+- 10**6 cpu cycles: 4823
+- 10**7 cpu cycles: 4819
+- 10**8 cpu cycles: 4919
+- 10**9 cpu cycles: 4958
+
+Max hits with system activity (fork + execve):
+- 1 fork + execve: 1407
+- 10 fork + execve: 0
+- 100 fork + execve: 7
+- 1000 fork + execve: 0

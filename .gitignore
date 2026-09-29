@@ -1,0 +1,11 @@
+*.cmd
+*.o
+*.ko
+*.mod.c
+*.order
+*.mod
+modules.order
+.vscode
+Module.symvers
+__pycache__
+.github

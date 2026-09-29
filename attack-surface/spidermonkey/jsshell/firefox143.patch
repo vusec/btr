@@ -1,0 +1,304 @@
+diff --git a/js/src/builtin/TestingFunctions.cpp b/js/src/builtin/TestingFunctions.cpp
+index 8ee9e19a0c19..749a1e4008b8 100644
+--- a/js/src/builtin/TestingFunctions.cpp
++++ b/js/src/builtin/TestingFunctions.cpp
+@@ -1748,6 +1748,275 @@ static void captureDisasmText(const char* text) {
+   printer->printf("\n");
+ }
+ 
++#define NANOSECONDS_PER_SECOND 1000000000L
++#if defined(__aarch64__)
++  #define MEM_BARRIER() { \
++    __asm__ __volatile__("dsb sy" ::: "memory"); \
++    __asm__ __volatile__("isb" ::: "memory"); \
++  }
++#elif defined(__x86_64__)
++  #define MEM_BARRIER() { __asm__ __volatile__("mfence;nop;nop;nop;nop"); }
++#else
++  #error MEM_BARRIER not supporting this architecture
++#endif
++
++static bool FlushBufOffset(JSContext* cx, unsigned argc, Value* vp) {
++  CallArgs args = CallArgsFromVp(argc, vp);
++  
++  if (args.length() < 2) {
++    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
++                              JSMSG_MORE_ARGS_NEEDED, "flushBufOffset", "1", "",
++                              "0");
++    return false;
++  }
++
++  if (!args[0].isObject() || !args[0].toObject().is<ArrayBufferObject>()) {
++    JS_ReportErrorASCII(cx, "The first argument must be a ArrayBuffer.");
++    return false;
++  }
++
++  if (!args[1].isNumber()) {
++    JS_ReportErrorASCII(cx, "The second argument must be a number.");
++    return false;
++  }
++
++  ArrayBufferObject* buf = &args[0].toObject().as<ArrayBufferObject>();
++  uint8_t *base = buf->dataPointer();
++  int32_t offset = args[1].toInt32();
++  uint8_t *addr = base + offset;
++
++  if (base == nullptr) return false;
++
++  // printf("%p\n", base);
++  // printf("%d %d\n", offset, base[offset]);
++
++  // Flush the d-cache for the slot containing the JIT-code pointer so that
++  // any writes to that slot are visible to the instruction fetch hardware.
++#if defined(__aarch64__)
++  {
++    // Clean D-cache to Point of Unification (PoU), then invalidate I-cache
++    // for that address. Sequence: DC CVAU; DSB; IC IVAU; DSB; ISB
++    __asm__ __volatile__("dc civac, %0" :: "r"(addr) : "memory");
++    __asm__ __volatile__("dsb sy" ::: "memory");
++    // __asm__ __volatile__("ic ivau, %0" :: "r"(addr) : "memory");
++    // __asm__ __volatile__("dsb ish" ::: "memory");
++    __asm__ __volatile__("isb" ::: "memory");
++  }
++#elif defined(__arm__)
++  {
++    // ARMv7/ARMv8 (AArch32) best-effort: fall back to GCC's builtin to ensure
++    // instruction cache coherence for the small slot range.
++    __builtin___clear_cache(reinterpret_cast<char*>(addr),
++                            reinterpret_cast<char*>(addr) + sizeof(void*));
++  }
++#elif defined(__x86_64__)
++  // On other platforms, rely on the general FlushICache helper which will do
++  // the right thing for the architecture (may perform dcache/icache maintenance
++  // as required).
++  // jit::FlushICache(reinterpret_cast<uint8_t*>(addr), sizeof(void*));
++  asm volatile("clflush (%0)"::"r"(addr));
++#endif
++  MEM_BARRIER();
++  asm volatile(".rept 1024\n nop\n .endr");
++  // ============
++
++  // timespec t0, t1;
++  // t0 = {};
++  // t1 = {};
++  // // MEM_BARRIER();
++  // clock_gettime(CLOCK_REALTIME, &t0);
++  // *addr^=0xc;
++  // MEM_BARRIER();
++  // clock_gettime(CLOCK_REALTIME, &t1);
++  // uint64_t t0ns = (uint64_t)((t0.tv_sec * NANOSECONDS_PER_SECOND) + t0.tv_nsec);
++  // uint64_t t1ns = (uint64_t)((t1.tv_sec * NANOSECONDS_PER_SECOND) + t1.tv_nsec);
++  // uint64_t t = t1ns - t0ns;
++
++  // args.rval().setInt32((int32_t)t);
++  // =============
++  args.rval().setUndefined();
++  return true;
++}
++
++static bool ReloadBufOffset(JSContext* cx, unsigned argc, Value* vp) {
++  MEM_BARRIER();
++  CallArgs args = CallArgsFromVp(argc, vp);
++  
++  if (args.length() < 2) {
++    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
++                              JSMSG_MORE_ARGS_NEEDED, "flushBufOffset", "1", "",
++                              "0");
++    return false;
++  }
++
++  if (!args[0].isObject() || !args[0].toObject().is<ArrayBufferObject>()) {
++    JS_ReportErrorASCII(cx, "The first argument must be a ArrayBuffer.");
++    return false;
++  }
++
++  if (!args[1].isNumber()) {
++    JS_ReportErrorASCII(cx, "The second argument must be a number.");
++    return false;
++  }
++
++  ArrayBufferObject* buf = &args[0].toObject().as<ArrayBufferObject>();
++  uint8_t *base = buf->dataPointer();
++  int32_t offset = args[1].toInt32();
++  // register uint8_t *addr asm("r9");
++  uint8_t *addr;
++  addr = base + offset;
++
++  if (base == nullptr) return false;
++
++  uint8_t junk;
++  timespec t0, t1;
++  t0 = {};
++  t1 = {};
++  MEM_BARRIER();
++  asm volatile(".rept 1024\n nop\n .endr");
++  clock_gettime(CLOCK_REALTIME, &t0);
++  junk = *addr;
++  MEM_BARRIER();
++  clock_gettime(CLOCK_REALTIME, &t1);
++  *addr = junk ^ 0xc;
++  uint64_t t0ns = (uint64_t)((t0.tv_sec * NANOSECONDS_PER_SECOND) + t0.tv_nsec);
++  uint64_t t1ns = (uint64_t)((t1.tv_sec * NANOSECONDS_PER_SECOND) + t1.tv_nsec);
++  uint64_t t = t1ns - t0ns;
++
++  args.rval().setInt32((int32_t)t);
++  return true;
++}
++
++static bool FlushFuncJitPtr(JSContext* cx, unsigned argc, Value* vp) {
++  MEM_BARRIER();
++  CallArgs args = CallArgsFromVp(argc, vp);
++
++  if (args.length() < 1) {
++    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
++                              JSMSG_MORE_ARGS_NEEDED, "flushFuncJitPtr", "1", "",
++                              "0");
++    return false;
++  }
++
++  if (!args[0].isObject() || !args[0].toObject().is<JSFunction>()) {
++    JS_ReportErrorASCII(cx, "The first argument must be a function.");
++    return false;
++  }
++
++  JSSprinter sprinter(cx);
++  if (!sprinter.init()) {
++    return false;
++  }
++ 
++  JSFunction* fun = &args[0].toObject().as<JSFunction>();
++  if (!fun->hasJitScript()) {
++    JS_ReportErrorASCII(cx, "The function is not JIT-compiled yet.");
++    return false;
++  }
++
++  BaseScript* script = fun->baseScript();
++  void *addr = (void*) ((uint64_t)script + BaseScript::offsetOfJitCodeRaw());
++  // printf("%p\n", addr);
++  if (addr==NULL) return false;
++  
++  // Flush the d-cache for the slot containing the JIT-code pointer so that
++  // any writes to that slot are visible to the instruction fetch hardware.
++#if defined(__aarch64__)
++  {
++    // Clean D-cache to Point of Unification (PoU), then invalidate I-cache
++    // for that address. Sequence: DC CVAU; DSB; IC IVAU; DSB; ISB
++    __asm__ __volatile__("dc civac, %0" :: "r"(addr) : "memory");
++    __asm__ __volatile__("dsb sy" ::: "memory");
++    // __asm__ __volatile__("ic ivau, %0" :: "r"(addr) : "memory");
++    // __asm__ __volatile__("dsb ish" ::: "memory");
++    __asm__ __volatile__("isb" ::: "memory");
++  }
++#elif defined(__arm__)
++  {
++    // ARMv7/ARMv8 (AArch32) best-effort: fall back to GCC's builtin to ensure
++    // instruction cache coherence for the small slot range.
++    __builtin___clear_cache(reinterpret_cast<char*>(addr),
++                            reinterpret_cast<char*>(addr) + sizeof(void*));
++  }
++#else
++  // On other platforms, rely on the general FlushICache helper which will do
++  // the right thing for the architecture (may perform dcache/icache maintenance
++  // as required).
++  // jit::FlushICache(reinterpret_cast<uint8_t*>(addr), sizeof(void*));
++  __asm__ __volatile__("clflush (%0)" :: "r"(addr) : "memory");
++  __asm__ __volatile__("mfence");
++#endif
++
++  args.rval().setUndefined();
++  return true;
++}
++
++
++static bool FlushFuncCode(JSContext* cx, unsigned argc, Value* vp) {
++  MEM_BARRIER();
++  CallArgs args = CallArgsFromVp(argc, vp);
++
++  if (args.length() < 1) {
++    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
++                              JSMSG_MORE_ARGS_NEEDED, "flushFuncJitPtr", "1", "",
++                              "0");
++    return false;
++  }
++
++  if (!args[0].isObject() || !args[0].toObject().is<JSFunction>()) {
++    JS_ReportErrorASCII(cx, "The first argument must be a function.");
++    return false;
++  }
++
++  JSSprinter sprinter(cx);
++  if (!sprinter.init()) {
++    return false;
++  }
++ 
++  JSFunction* fun = &args[0].toObject().as<JSFunction>();
++  if (!fun->hasJitScript()) {
++    JS_ReportErrorASCII(cx, "The function is not JIT-compiled yet.");
++    return false;
++  }
++
++  BaseScript* script = fun->baseScript();
++  uint64_t *ptr = (uint64_t *) ((uint64_t)script + BaseScript::offsetOfJitCodeRaw());
++  // printf("%p\n", addr);
++  if (ptr==NULL) return false;
++  void *addr = (void*)(*ptr);
++  
++  // Flush the d-cache for the slot containing the JIT-code pointer so that
++  // any writes to that slot are visible to the instruction fetch hardware.
++#if defined(__aarch64__)
++  {
++    // Clean D-cache to Point of Unification (PoU), then invalidate I-cache
++    // for that address. Sequence: DC CVAU; DSB; IC IVAU; DSB; ISB
++    __asm__ __volatile__("ic ivau, %0" :: "r"(addr) : "memory");
++    __asm__ __volatile__("dsb sy" ::: "memory");
++    // __asm__ __volatile__("ic ivau, %0" :: "r"(addr) : "memory");
++    // __asm__ __volatile__("dsb ish" ::: "memory");
++    __asm__ __volatile__("isb" ::: "memory");
++  }
++#elif defined(__arm__)
++  {
++    // ARMv7/ARMv8 (AArch32) best-effort: fall back to GCC's builtin to ensure
++    // instruction cache coherence for the small slot range.
++    __builtin___clear_cache(reinterpret_cast<char*>(addr),
++                            reinterpret_cast<char*>(addr) + sizeof(void*));
++  }
++#else
++  // On other platforms, rely on the general FlushICache helper which will do
++  // the right thing for the architecture (may perform dcache/icache maintenance
++  // as required).
++  // jit::FlushICache(reinterpret_cast<uint8_t*>(addr), 256);
++  __asm__ __volatile__("clflush (%0)" :: "r"(addr) : "memory");
++  __asm__ __volatile__("mfence");
++#endif
++
++  args.rval().setUndefined();
++  return true;
++}
++
+ static bool DisassembleNative(JSContext* cx, unsigned argc, Value* vp) {
+   CallArgs args = CallArgsFromVp(argc, vp);
+ 
+@@ -10992,6 +11261,23 @@ JS_FN_HELP("supportDifferentialTesting", TestingFunc_SupportDifferentialTesting,
+ "supportDifferentialTesting()",
+ "  Return the value of JS::SupportDifferentialTesting."),
+ 
++  JS_FN_HELP("flushbufoffset", FlushBufOffset, 2, 0,
++"flushbufoffset(buf, offset)",
++"  Flush at an offset of an ArrayBuffer object.\n"),
++
++  JS_FN_HELP("reloadbufoffset", ReloadBufOffset, 2, 0,
++"reloadbufoffset(buf, offset)",
++"  Flush at an offset of an ArrayBuffer object.\n"),
++
++  JS_FN_HELP("flushjitptr", FlushFuncJitPtr, 1, 0,
++"flushjit(func)",
++"  Flush the pointer variable to a JIT-compiled function out of the cache.\n"),
++
++  JS_FN_HELP("flushfunccode", FlushFuncCode, 1, 0,
++"flushfunccode(func)",
++"  Flush code of a JIT-compiled function out of the cache.\n"),
++
++
+   JS_FS_HELP_END
+ };
+ // clang-format on

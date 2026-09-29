@@ -1,0 +1,49 @@
+{
+  "config": {
+    "arch": "aarch64",
+    "block_repeat": 2,
+    "compile": true,
+    "encoding": "f64",
+    "gadget_off": 16,
+    "layout": "lattice",
+    "name": "leak_snippet_aarch64_f64",
+    "nr_func": 1,
+    "nr_loads": 32,
+    "out_dir": "wasm",
+    "pad_cross_page": 81,
+    "pad_fill_tail": 120,
+    "pad_sep": 127,
+    "pad_start_phase": 47,
+    "pool_repeat": 42
+  },
+  "files": {
+    "wasm": {
+      "bytes": 72937,
+      "path": "leak_snippet_aarch64_f64.wasm",
+      "sha256": "42ccbb2450da9a3a43c147ec0fee6adf8889e0bbac2e65c21f2bb659081b452b"
+    },
+    "wat": {
+      "bytes": 485172,
+      "path": "leak_snippet_aarch64_f64.wat",
+      "sha256": "8ae1a5c59482df0393c2c55e1f80cc0a3ab0aeab37015168b862145fb2016707"
+    }
+  },
+  "gadget": {
+    "bytes": 24,
+    "chunks": 3,
+    "first64": "0xd24f3800f9400f80",
+    "pool_offset": "0x10",
+    "pool_slot": 2,
+    "raw_bytes": 20
+  },
+  "generated_utc": "2026-09-11T07:56:40+00:00",
+  "generator": "make_target_wasm.py",
+  "wat2wasm": {
+    "command": "wat2wasm",
+    "flags": [
+      "--enable-multi-memory",
+      "--enable-memory64"
+    ],
+    "version": "1.0.41"
+  }
+}

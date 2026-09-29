@@ -1,0 +1,7 @@
+junk/
+results/
+notes/
+tmp/
+allocation.log
+layout.log
+*.o
