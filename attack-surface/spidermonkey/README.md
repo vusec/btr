@@ -4,34 +4,28 @@ This folder contains the code for the attack surface analysis on SpiderMonkey fr
 
 ## Setup
 
-Clone Firefox and check out the Firefox 143 tag:
+The toolchain runs in a container, so the host only needs Docker.
+`setup.sh` clones the Firefox 143 tag, applies the BTR patch, builds the image, builds the shell, and writes an env file that sets `JS_CMD`:
 
 ```sh
-git clone https://github.com/mozilla-firefox/firefox.git
-cd firefox
-git checkout DEVEDITION_143_0b9_BUILD1
-git apply $PATH_TO_THIS_REPO/attack-surface/spidermonkey/jsshell/firefox143.patch
+cd $PATH_TO_THIS_REPO/attack-surface/spidermonkey
+./setup.sh                        # x86_64 shell
+source docker/build/jsenv-x86.sh  # exports JS_CMD
 ```
 
-Copy the pre-built Mozilla build config from the artifact and set `MOZCONFIG`:
+The aarch64 shell is cross-compiled on the build host, so the binary has to be copied to the arm board and `JS_CMD` set there:
 
 ```sh
-cp -r $PATH_TO_THIS_REPO/attack-surface/spidermonkey/jsshell/.mozbuild $HOME/.mozbuild
-export MOZCONFIG=$HOME/.mozbuild/jsshell-arm   # aarch64
-export MOZCONFIG=$HOME/.mozbuild/jsshell-x86   # x86_64
+./setup.sh arm                    # objdir docker/build/obj-arm
+scp docker/build/obj-arm/dist/bin/js <board>:/path/to/js
+ssh <board> 'export JS_CMD=/path/to/js'
 ```
 
-Setup toolchain and build the JS shell:
+`docker/build/jsenv-arm.sh` records where the cross-compiled shell sits on the host, so it is not a path to run experiments from.
+An older board that cannot run the cross-compiled shell is built on the board itself instead.
 
-```sh
-mach bootstrap && mach build
-```
-
-Set `JS_CMD` to the compiled `js` binary before running any experiment:
-
-```sh
-export JS_CMD=/path/to/firefox/obj-${BUILD_PATH}/dist/bin/js
-```
+The image carries clang 19, rust 1.89 and cbindgen, so the build uses the container toolchain and the host toolchain versions do not matter.
+See `docker/README.md` for the image layout, the per-user tag, and running the steps by hand.
 
 The WebAssembly leak-snippet targets under `wasm/` are prebuilt; regenerate them
 with the unified generator (it auto-compiles and writes a sidecar), e.g.:
@@ -59,7 +53,7 @@ you can run standalone or via `make all`, and prints `PASS` / `FAIL` / `NO-SIGNA
 | `make frcalib`    | standalone: calibrate F+R hit/miss timing     | `fr_calib.sh` (run before stage 5 on a new host) |
 
 ```sh
-export JS_CMD=/path/to/obj-debug-x86_64-.../dist/bin/js
+source docker/build/jsenv-x86.sh     # sets JS_CMD (see Setup)
 make all UARCH=zen4 PAGES=8          # UARCH: x3 a76 zen4 raptorcove lioncove
 make tune PAGES=8                    # just re-derive nr_loads for an 8-page target
 make frcalib UARCH=zen4              # measure this host's F+R hit/miss latencies
