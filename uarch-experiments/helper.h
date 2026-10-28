@@ -36,29 +36,7 @@ static __always_inline void get_shuffled_array(int min, int max, int array[]) {
 }
 
 
-static void randomize_history(struct config * cfg, uint8_t * cond_array) {
-
-#if 1
-    int rand_array[MAX_HISTORY_SIZE];
-
-    get_shuffled_array(0, cfg->history_size, rand_array);
-
-    for(int i=0; i< cfg->history_size; i++) {
-        if (i < cfg->his_taken_branches) {
-            cond_array[rand_array[i]] = 1;
-        } else {
-            cond_array[rand_array[i]] = 0;
-        }
-    }
-
-    for(int i=cfg->history_size; i< MAX_HISTORY_SIZE; i++) {
-        cond_array[i] = 0;
-    }
-#else
-    for(int i=0; i<MAX_HISTORY_SIZE; i++) cond_array[i] = rand()&1;
-#endif
-
-}
+void randomize_history(struct config * cfg, uint8_t * cond_array);
 
 
 static __always_inline uint64_t get_45bit_random_value() {

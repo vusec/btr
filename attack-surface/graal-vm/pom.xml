@@ -190,7 +190,7 @@
                             <buildArgs>
                                 <buildArg>-R:+MemoryMaskingAndFencing</buildArg>
                                 <buildArg>--no-fallback</buildArg>
-                                <buildArg>-J-Xmx8g</buildArg>
+                                <buildArg>-J-Xmx16g</buildArg>
                                 <buildArg>-g</buildArg>
                             </buildArgs>
                         </configuration>

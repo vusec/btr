@@ -13,4 +13,4 @@ clean:
 	rm -f libfr.so
 
 so: main.c
-	gcc -fPIC -shared -o libfr.so main.c $(CFLAGS) -D$(ARCH)
+	gcc -fPIC -shared -o libfr.so main.c test_rsb.c $(CFLAGS) -D$(ARCH)
