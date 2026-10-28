@@ -59,9 +59,9 @@ source docker/build/jsenv-arm.sh
 
 `FIREFOX_SRC` overrides where the tree lives (`./firefox` by default); a missing
 tree is cloned, an existing one is only patched if the patch is not in yet, and a
-tree at another revision only warns. An existing `spidermonkey:ff143` image is
-reused only when it carries the toolchain for the requested `ARCH`, so an image
-built before the cross toolchain landed is rebuilt instead of failing at
+tree at another revision only warns. An existing `spidermonkey:ff143-<user>` image
+is reused only when it carries the toolchain for the requested `ARCH`, so an
+image built before the cross toolchain landed is rebuilt instead of failing at
 configure. `REBUILD_IMAGE=1 ./setup.sh` forces a rebuild either way.
 
 The same steps by hand, when something needs to be inspected or rerun:
@@ -105,11 +105,11 @@ Environment variables read by `docker-build.sh`:
 | `MOZBUILD` | `$FIREFOX_SRC/.mozbuild-docker` | mach state + container `HOME` |
 | `JOBS` | *(mach decides)* | parallel compile jobs |
 | `MOUNTS` | *(none)* | extra host paths to mount at the same path |
-| `IMAGE` | `spidermonkey:ff143` | image tag |
+| `IMAGE` | `spidermonkey:ff143-<user>` | image tag; the image bakes the invoking UID/GID, so it is tagged per user |
 
 The pinned rust version is a build arg: `./docker-build.sh image` passes the current
 UID/GID; to change rust, build directly, e.g.
-`docker build --build-arg RUST_VERSION=1.95.0 -t spidermonkey:ff143 docker`.
+`docker build --build-arg RUST_VERSION=1.95.0 -t spidermonkey:ff143-$(id -un) docker`.
 
 ## aarch64
 

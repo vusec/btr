@@ -13,7 +13,7 @@
 #   FIREFOX_TAG   release tag          (default DEVEDITION_143_0b9_BUILD1)
 #   ARCH          x86 or arm           (default x86)
 #   JOBS          parallel compile jobs(default: let mach decide)
-#   IMAGE         image tag            (default spidermonkey:ff143)
+#   IMAGE         image tag            (default spidermonkey:ff143-<user>)
 #   REBUILD_IMAGE 1 to rebuild the image even when it already exists
 #
 # The build itself is docker-build.sh; this script only prepares its inputs and
@@ -26,7 +26,7 @@ FIREFOX_SRC="${FIREFOX_SRC:-$PWD/firefox}"
 FIREFOX_REPO="${FIREFOX_REPO:-https://github.com/mozilla-firefox/firefox.git}"
 FIREFOX_TAG="${FIREFOX_TAG:-DEVEDITION_143_0b9_BUILD1}"
 JOBS="${JOBS:-}"
-IMAGE="${IMAGE:-spidermonkey:ff143}"
+IMAGE="${IMAGE:-spidermonkey:ff143-$(id -un)}"
 OBJDIR="${OBJDIR:-}"
 PATCH="$HERE/jsshell/firefox143.patch"
 

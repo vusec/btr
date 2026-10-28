@@ -19,7 +19,8 @@
 #   MOZBUILD      mach state + HOME dir  (default <FIREFOX_SRC>/.mozbuild-docker)
 #   JOBS          parallel compile jobs  (default: let mach decide)
 #   MOUNTS        extra host paths to mount at the same path, space separated
-#   IMAGE         image tag             (default spidermonkey:ff143)
+#   IMAGE         image tag             (default spidermonkey:ff143-<user>; the
+#                 image bakes the invoking UID/GID, so each user gets their own)
 #
 # Every mount keeps its host path inside the container, so the objdir's absolute
 # paths in build artifacts and debug info read the same on both sides.
@@ -33,7 +34,7 @@ OBJDIR="${OBJDIR:-$CTX/build/obj-$ARCH}"
 MOZBUILD="${MOZBUILD:-$FIREFOX_SRC/.mozbuild-docker}"
 JOBS="${JOBS:-}"
 MOUNTS="${MOUNTS:-}"
-IMAGE="${IMAGE:-spidermonkey:ff143}"
+IMAGE="${IMAGE:-spidermonkey:ff143-$(id -un)}"
 
 case "$ARCH" in
     x86|arm) ;;
