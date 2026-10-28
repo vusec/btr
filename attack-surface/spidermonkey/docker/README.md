@@ -30,29 +30,49 @@ build), not on the compiler, so a self-contained distro clang is used.
 
 ## Layout
 
-The launcher `docker-build.sh` sits one level up, in `attack-surface/spidermonkey/`;
-this `docker/` directory holds the image definition it uses.
+The launchers `setup.sh` and `docker-build.sh` sit one level up, in
+`attack-surface/spidermonkey/`; this `docker/` directory holds the image
+definition they use.
 
 ```
-../docker-build.sh         driver script (run this)
-docker/Dockerfile       ubuntu:24.04 + clang + pinned rust + cbindgen
+../setup.sh                    one-shot: tree + image + build + JS_CMD env file
+../docker-build.sh             driver script for the steps on their own
+docker/Dockerfile              ubuntu:24.04 + clang + pinned rust + cbindgen
 docker/mozconfig/jsshell-x86   FF143 js-shell config, x86_64
 docker/mozconfig/jsshell-arm   FF143 js-shell config, aarch64 (cross from any host arch)
-docker/build/           objdirs (gitignored), one per arch
+docker/build/                  objdirs (gitignored), one per arch
 ```
 
 ## Use
 
-Commands below are run from `attack-surface/spidermonkey/` (where `docker-build.sh`
-lives):
+Everything runs from `attack-surface/spidermonkey/`. One command does the whole
+build: it clones the tree at the release tag, applies the BTR patch, builds the
+image, builds the shell, and writes an env file with `JS_CMD`:
+
+```sh
+./setup.sh                            # x86_64 shell
+source docker/build/jsenv-x86.sh      # sets JS_CMD
+
+./setup.sh arm                        # aarch64 shell, cross-compiled
+source docker/build/jsenv-arm.sh
+```
+
+`FIREFOX_SRC` overrides where the tree lives (`./firefox` by default); a missing
+tree is cloned, an existing one is only patched if the patch is not in yet, and a
+tree at another revision only warns. An existing `spidermonkey:ff143` image is
+reused only when it carries the toolchain for the requested `ARCH`, so an image
+built before the cross toolchain landed is rebuilt instead of failing at
+configure. `REBUILD_IMAGE=1 ./setup.sh` forces a rebuild either way.
+
+The same steps by hand, when something needs to be inspected or rerun:
 
 ```sh
 # one-time: build the image
 ./docker-build.sh image
 
 # get the source and apply the BTR patch (once)
-git clone https://github.com/mozilla-firefox/firefox.git
-git -C firefox checkout DEVEDITION_143_0b9_BUILD1
+git clone --depth 1 --branch DEVEDITION_143_0b9_BUILD1 \
+    https://github.com/mozilla-firefox/firefox.git firefox
 git -C firefox apply jsshell/firefox143.patch
 
 # build the js shell (tree at ./firefox by default, or pass FIREFOX_SRC=...)
