@@ -1,0 +1,32 @@
+# FF143 JS shell, aarch64. Cross-compiled on the container's host arch with
+# clang --target=aarch64-linux-gnu against the aarch64 sysroot at
+# /usr/aarch64-linux-gnu; the same config is a native build on an aarch64 host.
+# No --enable-bootstrap, same as the x86 config.
+ac_add_options --target=aarch64-linux-gnu
+ac_add_options --enable-application=js
+ac_add_options --enable-js-shell
+ac_add_options --enable-jitspew
+
+# Build only the JS shell
+ac_add_options --enable-project=js
+
+# Use the image's clang, targeting aarch64, instead of a bootstrapped toolchain.
+# lld is the linker that understands aarch64 objects; the default bfd linker is
+# the host one.
+CC="clang --target=aarch64-linux-gnu"
+CXX="clang++ --target=aarch64-linux-gnu"
+ac_add_options --enable-linker=lld
+
+# The aarch64 sysroot has no libz, and pkg-config would answer for the host's
+# x86_64 zlib, so link the bundled copy under modules/zlib instead.
+ac_add_options --without-system-zlib
+
+# Enable the debugging tools: Assertions, debug only code etc.
+# ac_add_options --enable-debug
+
+# Enable optimizations as well so that the test suite runs much faster. If
+# you are having trouble using a debugger, you should disable optimization.
+ac_add_options --enable-optimize
+
+# The objdir is set by sm-docker via the MOZ_OBJDIR environment variable, so
+# build products land in a mounted directory outside the source tree.
